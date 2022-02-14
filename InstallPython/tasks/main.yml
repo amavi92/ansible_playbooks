@@ -1,0 +1,15 @@
+   - name: Fetching Python version
+     shell: /usr/local/bin/python3 --version |sed 's/^Python //'
+     register: python_version
+
+   - debug:
+       var: python_version.stdout
+
+
+   - name: Check if python3.7 is available
+     debug:
+        msg: "python3.7 available, no need to install"
+     when: python_version.stdout == "3.7.4"
+
+   - include: python.yml
+     when: python_version.stdout == ""

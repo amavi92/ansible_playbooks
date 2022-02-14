@@ -1,0 +1,13 @@
+---
+- name: ensure a list of packages installed
+  yum:
+    name: "{{ packages }}"
+  vars:
+    packages:
+    - gcc
+    - openssl-devel
+    - bzip2-devel
+    - libffi-devel
+    - xz-devel
+    # - libsqlite3-dev 
+  become: yes

@@ -1,0 +1,75 @@
+---
+- name: "Get current python3 version"
+  shell: /usr/local/bin/python3 --version |sed 's/^Python //'
+  register: python_version_current
+  changed_when: 'python_version_current.stdout != python_version_default'
+  check_mode: no
+
+- block:
+  - name: create Installation directory on target machine
+    file:
+      path: "{{ installation_dir }}"
+      state: directory
+
+  - name: create directory on target machine
+    file:
+      path: "{{ remote_copy_path }}"
+      state: directory
+
+  - name: check if Python tall ball is available
+    stat:
+      path: "{{ remote_copy_path }}/Python-{{ python_version_default }}.tgz"
+    register: python_tar_available
+
+  - name: Copying python tar File
+    copy:
+      src: "../rpms/Python-{{ python_version_default }}.tgz"
+      dest: "{{ remote_copy_path }}"
+    when: not python_tar_available.stat.exists
+
+  - name: "Unpack python {{ python_version_default }} source code"
+    unarchive:
+      src: "{{ remote_copy_path }}/Python-{{ python_version_default }}.tgz"
+      dest: "{{ installation_dir }}"
+      remote_src: yes
+    become: yes
+
+  - name: "Run 'configure' target as root"
+    command: chdir={{ installation_dir }}Python-{{ python_version_default }} ./configure --prefix={{ prefix_path }} --enable-shared --with-threads --enable-optimizations
+    become: yes
+    tags: skip_ansible_lint
+    register: configure_resp
+
+  - debug:
+      var: configure_resp
+
+  - name: "Run 'make install' target as root"
+    make:
+      chdir: "{{ installation_dir }}Python-{{ python_version_default }}"
+      target: altinstall
+      file: "{{ installation_dir }}Python-{{ python_version_default }}/Makefile"
+    # notify: python installed
+    become: yes
+    tags: skip_ansible_lint
+
+  - name: "Update alternatives for python2"
+    command: update-alternatives --install /usr/bin/python python /usr/bin/python2 50
+    become: yes
+    tags: skip_ansible_lint
+
+  - name: "Update alternatives for python3"
+    command: update-alternatives --install /usr/bin/python python {{ installation_dir }}/bin/python3.7 70
+    become: yes
+    tags: skip_ansible_lint
+
+  - name: "Transfer python .so file to lib64"
+    command: chdir={{ installation_dir }}/lib/ cp libpython3.7m.so.1.0 /lib64/
+    become: yes
+    tags: skip_ansible_lint
+
+  - name: "Remove python source code archive"
+    file:
+      path: "{{ installation_dir }}Python-{{ python_version_default }}.tgz"
+      state: absent
+    become: yes
+  when: 'python_version_current.stdout != python_version_default'

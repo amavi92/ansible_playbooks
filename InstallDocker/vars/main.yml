@@ -1,0 +1,8 @@
+---
+# vars file for Docker
+Docker_dir: /etc/docker
+docker_service_dir: /etc/systemd/system/docker.service.d
+daemon_json_file: /etc/docker/daemon.json
+Docker_repo_url: https://download.docker.com/linux/centos/docker-ce.repo
+Docker_repo_path: /etc/yum.repos.d/docker-ce.repo
+daemon_text: {"exec-opts": ["native.cgroupdriver=systemd"],"log-driver": "json-file","log-opts": {"max-size": "100m"},"storage-driver": "overlay2","storage-opts": ["overlay2.override_kernel_check=true"]}

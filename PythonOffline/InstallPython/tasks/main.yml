@@ -1,0 +1,24 @@
+---
+# tasks file for InstallPython
+ - name: Fetching Python version
+   shell: /usr/local/bin/python3 --version |sed 's/^Python //'
+   register: python_version
+
+ - debug:
+     var: python_version.stdout
+
+ - debug:
+     var: python_version
+
+ - name: Check if python3.7 is available
+   debug:
+      msg: "python3.7 already available, no need to install"
+   when: python_version.stdout == "3.7.4"
+
+ - block:
+   - name: Install dependent rpms
+     import_tasks: "{{ playbook_path }}/pre-install.yml"
+
+   - name: Install python
+     import_tasks: "{{ playbook_path }}/install.yml"
+   when: python_version.stdout == "" or python_version.stdout != python_version_default

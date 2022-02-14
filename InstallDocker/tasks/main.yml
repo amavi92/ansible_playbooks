@@ -1,0 +1,52 @@
+---
+# tasks file for Docker
+- name: Install yum-utils,device-mapper-persistent-data,lvm2
+  yum:
+    name:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+    state: latest
+
+- name: Add Docker repo
+  get_url:
+    url: "{{ Docker_repo_url }}"
+    dest: "{{ Docker_repo_path }}"
+  become: yes
+
+- name: Install Docker
+  yum:
+    name: ['docker-ce', 'docker-ce-cli', 'containerd.io']
+    state: latest
+  become: yes
+
+- name: Create docker directory
+  file:
+    path: "{{ Docker_dir }}"
+    state: directory
+
+- name: Create docker.service.d directory
+  file:
+    path: "{{ docker_service_dir }}"
+    state: directory
+
+- name: copying file with playbook
+  copy:
+    src: daemon.json
+    dest: "{{ daemon_json_file }}"
+  become: yes
+
+- name: Systemctl daemon_reload
+  systemd:
+    daemon_reload: yes
+
+- name: Restart Docker
+  systemd:
+    state: restarted
+    name: docker
+
+- name: Enable Docker
+  systemd:
+    name: docker
+    state: started
+    enabled: yes

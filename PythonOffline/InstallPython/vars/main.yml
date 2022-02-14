@@ -1,0 +1,7 @@
+---
+# vars file for InstallPython
+remote_copy_path: /usr/local/Ericsson/rpms
+install_dest: /usr/src/ # Use in production
+# installation_dir: /home/ansible/software/installations/
+prefix_path: /usr/local # Use in production
+# prefix_path: /home/ansible/software/installations/

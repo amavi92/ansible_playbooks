@@ -1,0 +1,191 @@
+---
+# - name: Running ansible playbook for Hadoop cluster
+#   become: true
+#
+#   tasks:
+- name: Create target directory on machine if not available.
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ user_name }}"
+    group: "{{ user_group }}"
+  with_items:
+    - "{{ hadoop_base_dir }}"
+    - "{{ hadoop_dir_path }}"
+
+- name: Copying Installation Files
+  copy:
+    src: "../rpms/hadoop-{{ hadoop_version }}.tar.gz"
+    dest: "{{ hadoop_base_dir }}"
+    owner: "{{ user_name }}"
+    group: "{{ user_group }}"
+
+- name: Unarchive hadoop
+  unarchive:
+    src: "{{ hadoop_base_dir }}/hadoop-{{ hadoop_version }}.tar.gz"
+    dest: "{{ hadoop_base_dir }}"
+    owner: "{{ user_name }}"
+    group: "{{ user_group }}"
+    copy: no
+
+- name: Create symbolic link for hadoop
+  file:
+    src: "{{ hadoop_base_dir }}/hadoop-{{ hadoop_version }}"
+    dest: "{{ hadoop_home }}"
+    owner: "{{ user_name }}"
+    group: "{{ user_group }}"
+    state: link
+
+- name: Create directory if they don't exist #Change path to /home/hadoop/data in prod
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ user_name }}"
+    group: "{{ user_group }}"
+    # mode: 777
+    mode: 0775
+  loop:
+    - "{{ hadoop_dir_path }}/jn"
+    - "{{ hadoop_dir_path }}/nameNode"
+    - "{{ hadoop_dir_path }}/rmstore"
+    - "{{ hadoop_dir_path }}/dataNode"
+    - "{{ hadoop_dir_path }}/dn_socket"
+    - "{{ hadoop_dir_path }}/hdfs"
+
+# - name: Copy workers to all nodes
+#   copy:
+#     src: "{{ item }}"
+#     dest: "{{ hadoop_base_dir }}/hadoop-{{ hadoop_version }}/etc/hadoop/"
+#   loop:
+#     - workers
+#     - yarn-site.xml
+#     - core-site.xml
+#     - hdfs-site.xml
+
+- name: Copy bashrc to all nodes
+  copy:
+    src: .bashrc
+    dest: "{{ bashrc_path }}"
+
+- name: Initialize bashrc file
+  shell: source "{{ bashrc_path }}/.bashrc"
+  args:
+    executable: /bin/bash
+
+- name: Update workers
+  ansible.builtin.template:
+    src: ../templates/workers.j2
+    dest: "{{ hadoop_base_dir }}/{{ hadoop_extracted_dir }}/etc/hadoop/workers"
+    owner: "{{ user_name }}"
+    group: "{{ user_group }}"
+
+- name: Update yarn site properties
+  ansible.builtin.template:
+    src: ../templates/yarn-site.xml.j2
+    dest: "{{ hadoop_base_dir }}/{{ hadoop_extracted_dir }}/etc/hadoop/yarn-site.xml"
+    owner: "{{ user_name }}"
+    group: "{{ user_group }}"
+
+- name: Update core site properties
+  ansible.builtin.template:
+    src: ../templates/core-site.xml.j2
+    dest: "{{ hadoop_base_dir }}/{{ hadoop_extracted_dir }}/etc/hadoop/core-site.xml"
+    owner: "{{ user_name }}"
+    group: "{{ user_group }}"
+
+- name: Update hdfs site properties
+  ansible.builtin.template:
+    src: ../templates/hdfs-site.xml.j2
+    dest: "{{ hadoop_base_dir }}/{{ hadoop_extracted_dir }}/etc/hadoop/hdfs-site.xml"
+    owner: "{{ user_name }}"
+    group: "{{ user_group }}"
+
+- name: Disable firewalld Services
+  service:
+    name: "{{item}}"
+    state: stopped
+    enabled: no
+  loop:
+   - firewalld
+  ignore_errors: yes
+
+- name: Install libselinux as prerequisite for SELinux Ansible module
+  yum:
+    name: ['libselinux-python', 'libsemanage-python']
+    state: latest
+
+- name: Disable SELinux at next reboot
+  selinux:
+    state: disabled
+
+- name: Set SELinux in permissive mode until the machine is rebooted
+  command: setenforce 0
+  ignore_errors: true
+  changed_when: false
+
+# - name: disable selinux
+#   command: /sbin/setenforce 0
+
+
+
+# - hosts: NameNode
+#   vars_prompt:
+#        - name: nndir
+#          private: no
+#          prompt: "Enter location directory path and name for Name Node"
+# tasks:
+#        - name: "Creating Name Node Directory"
+#          file:
+#              state: directory
+#              path: "{{ nndir }}"
+# - name: "Configuring hdfs-site.xml in Name Node"
+#          lineinfile:
+#                  path: "/etc/hadoop/hdfs-site.xml"
+#                  insertafter: "<configuration>"
+#                  line: "<property>
+#                    \n\t <name>dfs.name.dir</name>
+#                    \n\t <value>{{ nndir }}</value>
+#                      \n </property>"
+# - name: "Configuring core-site.xml in Name Node"
+#          lineinfile:
+#                  path: "/etc/hadoop/core-site.xml"
+#                  insertafter: "<configuration>"
+#                  line: "<property>
+#                    \n\t <name>fs.default.name</name>
+#                    \n\t <value>hdfs://{{ groups['NameNode'][0] }}:9001</value>
+#                      \n </property>"
+# - name: "Formatting Name Node Directory"
+#          ignore_errors: yes
+#          command: "hadoop NameNode -format -force"
+#        - name: "Starting Name Node daemon"
+#          ignore_errors: yes
+#          command: "hadoop-daemon.sh start NameNode"
+# - hosts: DataNode
+#   vars_prompt:
+#        - name: dndir
+#          private: no
+#          prompt: "Enter location directory path and name for Data Node"
+# tasks:
+#        - name: "Creating Data Node Directory"
+#          file:
+#              state: directory
+#              path: "{{ dndir }}"
+# - name: "Configuring hdfs-site.xml in Data Node"
+#          lineinfile:
+#                  path: "/etc/hadoop/hdfs-site.xml"
+#                  insertafter: "<configuration>"
+#                  line: "<property>
+#                    \n\t <name>dfs.data.dir</name>
+#                    \n\t <value>{{ dndir }}</value>
+#                      \n </property>"
+# - name: "Configuring core-site.xml in Data Node"
+#          lineinfile:
+#                  path: "/etc/hadoop/core-site.xml"
+#                  insertafter: "<configuration>"
+#                  line: "<property>
+#                    \n\t <name>fs.default.name</name>
+#                    \n\t <value>hdfs://{{ groups['NameNode'][0] }}:9001</value>
+#                      \n </property>"
+# - name: "Starting Data Node daemon"
+#          ignore_errors: yes
+#          command: "hadoop-daemon.sh start DataNode"

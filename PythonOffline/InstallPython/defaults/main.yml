@@ -1,0 +1,5 @@
+---
+# defaults file for InstallPython
+python_version_default: 3.7.4
+python_ver_var: 3.7
+playbook_path: InstallPython/tasks

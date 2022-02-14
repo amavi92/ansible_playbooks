@@ -1,0 +1,101 @@
+---
+# tasks file for InstallPython
+- name: create directory on target machine
+  file:
+    path: /usr/local/Ericsson/rpms
+    state: directory
+
+- name: check if bzip2-devel is available
+  stat:
+    path: "{{ remote_copy_path }}/bzip2-devel-1.0.6-13.el7.x86_64.rpm"
+  register: bzip2_devel_available
+
+- name: check if libffi-devel is available
+  stat:
+    path: "{{ remote_copy_path }}/libffi-devel-3.0.13-19.el7.x86_64.rpm"
+  register: libffi_devel_available
+
+- name: check if xz-devel is available
+  stat:
+    path: "{{ remote_copy_path }}/xz-devel-5.2.2-1.el7.x86_64.rpm"
+  register: xz_devel_available
+
+- name: check if zlib-devel is available
+  stat:
+    path: "{{ remote_copy_path }}/zlib-devel-1.2.7-18.el7.x86_64.rpm"
+  register: zlib_devel_available
+
+- name: check if bzip2-devel is available locally
+  stat:
+    path: ../rpms/bzip2-devel-1.0.6-13.el7.x86_64.rpm
+  register: bzip2_devel_local_available
+  delegate_to: localhost
+  when: bzip2_devel_available.stat.exists == false
+
+- name: check if libffi-devel is available locally
+  stat:
+    path: ../rpms/libffi-devel-3.0.13-19.el7.x86_64.rpm
+  register: libffi_devel_local_available
+  delegate_to: localhost
+  when: libffi_devel_available.stat.exists == false
+
+- name: check if xz_devel is available locally
+  stat:
+    path: ../rpms/xz-devel-5.2.2-1.el7.x86_64.rpm
+  register: xz_devel_local_available
+  delegate_to: localhost
+  when: xz_devel_available.stat.exists == false
+
+- name: check if zlib-devel is available locally
+  stat:
+    path: ../rpms/zlib-devel-1.2.7-18.el7.x86_64.rpm
+  register: zlib_devel_local_available
+  delegate_to: localhost
+  when: zlib_devel_available.stat.exists == false
+
+- block:
+    - name: "end play if dependent rpms are not present locally"
+      debug:
+        msg: "Dependent rpms not available at local, ending play"
+
+    - meta: end_play
+  when: (bzip2_devel_available.stat.exists == false and bzip2_devel_local_available.stat.exists == false) or (libffi_devel_available.stat.exists == false and libffi_devel_local_available.stat.exists == false) or (xz_devel_available.stat.exists == false and xz_devel_local_available.stat.exists == false) or (zlib_devel_available.stat.exists == false and zlib_devel_local_available.stat.exists == false)
+
+- name: Copy bzip2-devel rpm package
+  copy:
+    src: "{{ item }}"
+    dest: "{{ remote_copy_path }}"
+    force: yes
+    # become: yes
+  with_items:
+    - bzip2-devel-1.0.6-13.el7.x86_64.rpm
+    - libffi-devel-3.0.13-19.el7.x86_64.rpm
+    - xz-devel-5.2.2-1.el7.x86_64.rpm
+    - zlib-devel-1.2.7-18.el7.x86_64.rpm
+
+- name: Install rpm packages from directory
+  command: "{{ item }}"
+  register: std_resp
+  # state: absent
+  ignore_errors: yes
+  with_items:
+    - rpm -ivh "{{ remote_copy_path }}/bzip2-devel-1.0.6-13.el7.x86_64.rpm"
+    - rpm -ivh "{{ remote_copy_path }}/libffi-devel-3.0.13-19.el7.x86_64.rpm"
+    - rpm -ivh "{{ remote_copy_path }}/xz-devel-5.2.2-1.el7.x86_64.rpm"
+    - rpm -ivh "{{ remote_copy_path }}/zlib-devel-1.2.7-18.el7.x86_64.rpm"
+  # when: std_resp.msg == "non-zero return code"
+
+  # with_items:
+  #   - rpm -ivh /usr/local/Ericsson/rpms/bzip2-devel-1.0.6-13.el7.x86_64.rpm
+  #   - rpm -ivh /usr/local/Ericsson/rpms/libffi-devel-3.0.13-19.el7.x86_64.rpm
+  #   - rpm -ivh /usr/local/Ericsson/rpms/xz-devel-5.2.2-1.el7.x86_64.rpm
+  #   - rpm -ivh /usr/local/Ericsson/rpms/zlib-devel-1.2.7-18.el7.x86_64.rpm
+
+# - name: Install rpm packages from directory
+#       command: rpm -ivh /usr/local/Ericsson/rpms/libffi-devel-3.0.13-19.el7.x86_64.rpm
+#
+# - name: Install rpm packages from directory
+#       command: rpm -ivh /usr/local/Ericsson/rpms/xz-devel-5.2.2-1.el7.x86_64.rpm
+#
+# - name: Install rpm packages from directory
+#       command: rpm -ivh /usr/local/Ericsson/rpms/zlib-devel-1.2.7-18.el7.x86_64.rpm
