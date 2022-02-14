@@ -1,0 +1,6 @@
+---
+- hosts: NameNode, DataNode
+  strategy: free
+  roles:
+      # - { role: SSHConnect, when: type == 'Install' }
+      - { role: SSHPasswordLess, when: type == 'Install' }

@@ -1,0 +1,10 @@
+---
+# vars file for SSHPasswordLess
+group_name: ansiblegroup
+user_name: ansible
+user_password: ansible@123
+ssh_key_path: '/home/{{ user_name }}/.ssh/id_rsa.pub'
+ssh_key_filename: id_rsa
+remote_machine_username: ansible
+remote_machine_password: ansible@123
+current_host_name: "{{ ansible_ens192.ipv4.address }}"

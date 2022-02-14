@@ -1,0 +1,117 @@
+---
+- name: check .ssh local directory exists
+  stat:
+    path: "/home/{{ user_name }}/.ssh"
+  register: ssh_directory_exists_check
+
+# - debug:
+#     var: ssh_directory_exists_check
+
+- name: Check needed OS tools exist
+  shell: which sshpass ssh-keygen ssh-copy-id
+  register: os_tools_exist
+  ignore_errors: true
+
+- name: Install sshpass
+  yum:
+    name: sshpass
+    state: latest
+  when: os_tools_exist.rc != 0
+
+- name: Check needed OS tools exist again
+  shell: which sshpass ssh-keygen ssh-copy-id
+  register: os_tools_exist
+  ignore_errors: true
+
+- name: Fail execution if any of the needed OS tools is missing
+  fail:
+    msg: "One or more of the: sshpass, ssh-keygen, ssh-copy-id are missing on this machine. Please install them - using your distribution's recommended method - before continuing."
+  when: os_tools_exist.rc != 0
+
+- name: create /home/{{ user_name }}/.ssh local directory
+  file:
+    path: "/home/{{ user_name }}/.ssh"
+    state: directory
+    mode: "0700"
+  register: ssh_directory_creation
+  when: ssh_directory_exists_check is defined and ssh_directory_exists_check.stat.exists == false
+
+- debug:
+    var: ssh_directory_creation
+
+- name: check .ssh key file exists
+  stat:
+    path: "/home/{{ user_name }}/.ssh/{{item}}"
+  register: ssh_key_file_exists_check
+  with_items:
+    - "{{ssh_key_filename}}"
+    - "{{ssh_key_filename}}.pub"
+
+# - debug:
+#     var: ssh_key_file_exists_check.results[1].stat.exists
+
+- name: generate ssh key on local machine
+  shell: "ssh-keygen -t rsa -f /home/{{ user_name }}/.ssh/{{ssh_key_filename}} -P \"\" -C {{ user_name }}@{{ inventory_hostname }}"
+  register: ssh_key_creation
+  failed_when: ssh_key_creation.rc != 0
+  become_user: yes
+  when: ssh_key_file_exists_check is defined and ssh_key_file_exists_check.results[0].stat.exists == false and ssh_key_file_exists_check.results[1].stat.exists == false
+
+- debug:
+    var: ssh_key_creation
+
+- name: check .ssh/config file exists
+  stat:
+    path: "/home/{{ user_name }}/.ssh/config"
+  register: ssh_config_file_exists_check
+
+- debug:
+    var: ssh_config_file_exists_check
+
+- name: create the /home/{{ user_name }}/.ssh/config file
+  file:
+    path: "/home/{{ user_name }}/.ssh/config"
+    state: touch
+    mode: "0644"
+  register: ssh_config_file_creation
+  when: ssh_config_file_exists_check is defined and ssh_config_file_exists_check.stat.exists == false
+
+- name: add the new ssh key to the /home/{{ user_name }}/.ssh/config file
+  lineinfile:
+    path: "/home/{{ user_name }}/.ssh/config"
+    line: "IdentityFile /home/{{ user_name }}/.ssh/{{ssh_key_filename}}"
+    state: present
+    backup: yes
+    # owner: "{{ user_name }}"
+    # group: "{{ group_name }}"
+  register: ssh_config_file_key_addition
+
+- debug:
+    var: ssh_config_file_key_addition
+
+- name: Change ownership of ssh key filePermissions
+  file:
+    path: "/home/{{ user_name }}/.ssh"
+    state: directory
+    recurse: yes
+    owner: "{{ user_name }}"
+    group: "{{ group_name }}"
+
+- name: distribute the ssh key to the remote hosts
+  shell: "/bin/sshpass -p \"{{remote_machine_password}}\" ssh-copy-id -o StrictHostKeyChecking=no -i /home/{{ user_name }}/.ssh/{{ssh_key_filename}}.pub -p {{ hostvars[item].ansible_port }} \"{{remote_machine_username}}@{{ hostvars[item].ansible_host }}\""
+  register: ssh_copy_id_execution
+  with_items:
+    - "{{ groups['ansible_setup_passwordless_setup_group']}}"
+  failed_when: ssh_copy_id_execution.rc != 0
+
+- debug:
+    var: ssh_copy_id_execution
+
+# - name: check ssh to remote hosts works
+#   shell: "hostname; id"
+#   register: ssh_connection_test
+#   failed_when: ssh_connection_test.rc != 0
+#
+# - name: print the connectivity test results
+#   debug:
+#     var: ssh_connection_test.stdout_lines

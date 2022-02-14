@@ -1,0 +1,5 @@
+---
+# vars file for SSHConnect
+group_name: ansiblegroup
+user_name: ansible
+user_password: ansible@123

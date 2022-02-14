@@ -1,0 +1,58 @@
+---
+- name: "check if ansiblegroup is present"
+  command: cat /etc/group
+  register: grp_exist
+  when : ( type == "Install" and inventory_hostname in groups['NIFI_Server'] ) or ( type == "Install" and inventory_hostname in groups['NameNode'] ) or ( type == "Install" and inventory_hostname in groups['DataNode'] )
+
+- name: ansiblegroup add if not already present
+  group:
+    name: '{{ group_name }}'
+    state: present
+  when : ( type == "Install" and inventory_hostname in groups['NIFI_Server'] and "ansiblegroup" not in grp_exist.stdout) or ( type == "Install" and inventory_hostname in groups['NameNode'] and "ansiblegroup" not in grp_exist.stdout) or ( type == "Install" and inventory_hostname in groups['DataNode'] and "ansiblegroup" not in grp_exist.stdout)
+
+- name: check if ansible already present
+  shell: cat /etc/passwd
+  register: user_exists
+
+- name: Add ansible user
+  user:
+       name: '{{ user_name }}'
+       password: "{{ user_password | password_hash('sha512') }}"
+  become: yes
+  when :  ( type == "Install" and inventory_hostname in groups['NIFI_Server'] ) or ( type == "Install" and inventory_hostname in groups['NameNode'] ) or ( type == "Install" and inventory_hostname in groups['DataNode'] )
+
+- name: add ansible to ansiblegroup
+  command: 'usermod -a -G ansiblegroup ansible'
+  when: ( type == "Install" and inventory_hostname in groups['NIFI_Server'] and 'ansiblegroup' in grp_exist.stdout and 'ansible' in user_exists.stdout ) or ( type == "Install" and inventory_hostname in groups['NameNode'] and 'ansiblegroup' in grp_exist.stdout and 'ansible' in user_exists.stdout ) or ( type == "Install" and inventory_hostname in groups['DataNode'] and 'ansiblegroup' in grp_exist.stdout and 'ansible' in user_exists.stdout)
+
+- name: Allow ansible to have sudo access
+  lineinfile:
+    dest: /etc/sudoers
+    state: present
+    insertbefore: EOF
+    line: '{{ user_name }} ALL=(ALL)       ALL'
+  become: yes
+  when: type == "Install"
+
+- name: change ownership of ansible home directory
+  file:
+    path: /home/{{ user_name }}
+    owner: '{{ user_name }}'
+    group: '{{ group_name }}'
+
+
+
+# - name: Setup | authorized key upload
+#   authorized_key: user={{ user_name }}
+#     key="{{ lookup('file', {{ ssh_key_path }}) }}"
+#     path='/home/{{ user_name }}/.ssh/authorized_keys'
+#     manage_dir=no
+#   sudo: true
+
+# - name: Sudoers | update sudoers file and validate
+#   lineinfile: "dest=/etc/sudoers
+#     insertafter=EOF
+#     line='{{ user_name }} ALL=(ALL) NOPASSWD: ALL'
+#     regexp='{{ user_name }} ALL=(ALL) NOPASSWD: ALL'
+#     state=present"
+#   sudo: true

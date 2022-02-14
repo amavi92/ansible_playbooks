@@ -1,0 +1,5 @@
+---
+  - name: Install dependencies
+    yum:
+      name: sshpass
+      state: latest
